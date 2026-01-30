@@ -1,0 +1,9 @@
+# Production dependencies
+# Add your dependencies here
+
+# Development dependencies (install with: pip install -e ".[dev]")
+# pytest>=7.0
+# pytest-cov>=4.0
+# black>=23.0
+# ruff>=0.1.0
+# mypy>=1.0
