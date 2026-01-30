@@ -33,6 +33,10 @@ dev = [
 
 [project.scripts]
 code-agent = "code_agent_by_claude.main:main"
+run-researcher = "code_agent_by_claude.run_researcher:main"
+run-planner = "code_agent_by_claude.run_planner:main"
+run-detail-planner = "code_agent_by_claude.run_detail_planner:main"
+run-coder = "code_agent_by_claude.run_coder:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

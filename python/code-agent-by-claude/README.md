@@ -1,9 +1,12 @@
 # Code Agent by Claude
 
-AI-powered coding agents using the Claude Agent SDK. This project implements a two-agent system:
+AI-powered coding agents using the Claude Agent SDK.
+This project implements a four-agent pipeline:
 
-1. **Planner Agent** - Analyzes requirements and creates detailed implementation plans
-2. **Coder Agent** - Implements code based on the plans
+1. **Researcher** — Explores the codebase and researches unfamiliar concepts
+2. **Planner** — Reads research findings and creates a high-level plan
+3. **Detail Planner** — Breaks the plan into small, self-contained parts
+4. **Coder** — Iterates through the TODO checklist, implementing each part
 
 ## Installation
 
@@ -70,7 +73,78 @@ async def advanced_usage():
     return result
 ```
 
-### Using Individual Agents
+### Running Individual Agents
+
+Each agent can be run in isolation via its own CLI command.
+This is useful for debugging or running a single pipeline stage.
+
+#### Researcher
+
+Explores the codebase and researches unfamiliar concepts.
+
+```bash
+run-researcher --task "Understand the auth flow" --working-dir ./my-project
+run-researcher --task "Research caching strategies" --show-thinking
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--task` | *(required)* | Coding task description |
+| `--working-dir` | `.` | Working directory |
+| `--show-thinking` | off | Show agent thinking |
+| `--show-tools` | off | Show tool usage |
+
+#### Planner
+
+Reads research findings and creates a high-level implementation plan.
+
+```bash
+run-planner --working-dir ./my-project
+run-planner --research-dir research --show-tools
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--working-dir` | `.` | Working directory |
+| `--research-dir` | `research` | Path to research output |
+| `--show-thinking` | off | Show agent thinking |
+| `--show-tools` | off | Show tool usage |
+
+#### Detail Planner
+
+Breaks the high-level plan into small, self-contained parts
+written as individual markdown files in `detail_plans/`.
+
+```bash
+run-detail-planner --working-dir ./my-project
+run-detail-planner --plans-dir plans --show-thinking
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--working-dir` | `.` | Working directory |
+| `--plans-dir` | `plans` | Path to plans directory |
+| `--show-thinking` | off | Show agent thinking |
+| `--show-tools` | off | Show tool usage |
+
+#### Coder
+
+Iterates through the `detail_plans/TODO.md` checklist,
+implementing each part and running tests.
+
+```bash
+run-coder --working-dir ./my-project
+run-coder --plans-dir plans --show-tools
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--working-dir` | `.` | Working directory |
+| `--plans-dir` | `plans` | Path to plans directory |
+| `--show-thinking` | off | Show agent thinking |
+| `--show-tools` | off | Show tool usage |
+
+### Using Agents from Python
 
 ```python
 from code_agent_by_claude import PlannerAgent, CoderAgent

@@ -1,31 +1,24 @@
-"""Process SDK messages into typed streaming events."""
+"""Process SDK messages into streaming events."""
 
 from __future__ import annotations
 
 from claude_agent_sdk import (
-    AssistantMessage,
-    ResultMessage,
-    SystemMessage,
+    AssistantMessage, ResultMessage, SystemMessage,
 )
 
 from .events import (
-    EventType,
-    StreamEvent,
-    TextEvent,
-    ToolEvent,
-    ThinkingEvent,
-    ProgressEvent,
+    EventType, StreamEvent, TextEvent,
+    ToolEvent, ThinkingEvent, ProgressEvent,
 )
 from .stream_handler import StreamHandler
 
 
 class MessageProcessor:
-    """Converts Claude Agent SDK messages into typed events
-    and emits them through a StreamHandler."""
+    """Converts Claude Agent SDK messages into typed
+    events and emits them via a StreamHandler."""
 
     def __init__(
-        self,
-        handler: StreamHandler,
+        self, handler: StreamHandler,
         agent_name: str = "",
         session_id: str = "",
     ) -> None:
@@ -41,12 +34,11 @@ class MessageProcessor:
             await self._process_assistant(message)
         elif isinstance(message, ResultMessage):
             await self._process_result(message)
-        # StreamEvent from SDK (partial messages)
         elif hasattr(message, "event"):
             await self._process_stream_event(message)
 
     async def _process_system(
-        self, message: SystemMessage
+        self, message: SystemMessage,
     ) -> None:
         if message.subtype == "init":
             event = ProgressEvent(
@@ -54,12 +46,11 @@ class MessageProcessor:
                 agent_name=self.agent_name,
                 session_id=self.session_id,
                 message="Session initialized",
-                data=message.data,
-            )
+                data=message.data)
             await self.handler.emit(event)
 
     async def _process_assistant(
-        self, message: AssistantMessage
+        self, message: AssistantMessage,
     ) -> None:
         for block in message.content:
             if hasattr(block, "text"):
@@ -67,30 +58,26 @@ class MessageProcessor:
                     type=EventType.TEXT_DELTA,
                     agent_name=self.agent_name,
                     session_id=self.session_id,
-                    text=block.text,
-                )
+                    text=block.text)
                 await self.handler.emit(event)
-            elif hasattr(block, "name") and hasattr(
-                block, "input"
-            ):
-                # ToolUseBlock
+            elif (hasattr(block, "name")
+                    and hasattr(block, "input")):
                 event = ToolEvent(
                     type=EventType.TOOL_START,
                     agent_name=self.agent_name,
                     session_id=self.session_id,
-                    tool_name=getattr(block, "name", ""),
+                    tool_name=getattr(
+                        block, "name", ""),
                     tool_input=getattr(
-                        block, "input", {}
-                    ),
-                    tool_use_id=getattr(block, "id", ""),
-                )
+                        block, "input", {}),
+                    tool_use_id=getattr(
+                        block, "id", ""))
                 await self.handler.emit(event)
-            elif hasattr(block, "content") and hasattr(
-                block, "tool_use_id"
-            ):
-                # ToolResultBlock
+            elif (hasattr(block, "content")
+                    and hasattr(block, "tool_use_id")):
                 result_text = ""
-                content = getattr(block, "content", "")
+                content = getattr(
+                    block, "content", "")
                 if isinstance(content, str):
                     result_text = content
                 elif isinstance(content, list):
@@ -106,9 +93,7 @@ class MessageProcessor:
                     tool_name="",
                     tool_result=result_text,
                     tool_use_id=getattr(
-                        block, "tool_use_id", ""
-                    ),
-                )
+                        block, "tool_use_id", ""))
                 await self.handler.emit(event)
             elif hasattr(block, "thinking"):
                 event = ThinkingEvent(
@@ -116,44 +101,38 @@ class MessageProcessor:
                     agent_name=self.agent_name,
                     session_id=self.session_id,
                     thinking=getattr(
-                        block, "thinking", ""
-                    ),
-                )
+                        block, "thinking", ""))
                 await self.handler.emit(event)
 
     async def _process_result(
-        self, message: ResultMessage
+        self, message: ResultMessage,
     ) -> None:
         if message.subtype == "success":
             event = TextEvent(
                 type=EventType.TEXT_DELTA,
                 agent_name=self.agent_name,
                 session_id=self.session_id,
-                text=message.result,
-            )
+                text=message.result)
             await self.handler.emit(event)
 
     async def _process_stream_event(
-        self, message: object
+        self, message: object,
     ) -> None:
-        """Process a raw SDK StreamEvent (partial message)."""
+        """Process a raw SDK StreamEvent."""
         raw = getattr(message, "event", {})
         if not isinstance(raw, dict):
             return
-
         event_type = raw.get("type", "")
 
         if event_type == "content_block_delta":
             delta = raw.get("delta", {})
             delta_type = delta.get("type", "")
-
             if delta_type == "text_delta":
                 event = TextEvent(
                     type=EventType.TEXT_DELTA,
                     agent_name=self.agent_name,
                     session_id=self.session_id,
-                    text=delta.get("text", ""),
-                )
+                    text=delta.get("text", ""))
                 await self.handler.emit(event)
             elif delta_type == "thinking_delta":
                 event = ThinkingEvent(
@@ -161,17 +140,14 @@ class MessageProcessor:
                     agent_name=self.agent_name,
                     session_id=self.session_id,
                     thinking=delta.get(
-                        "thinking", ""
-                    ),
-                )
+                        "thinking", ""))
                 await self.handler.emit(event)
             elif delta_type == "input_json_delta":
                 event = StreamEvent(
                     type=EventType.PROGRESS,
                     agent_name=self.agent_name,
                     session_id=self.session_id,
-                    data=delta,
-                )
+                    data=delta)
                 await self.handler.emit(event)
 
         elif event_type == "content_block_start":
@@ -182,6 +158,5 @@ class MessageProcessor:
                     agent_name=self.agent_name,
                     session_id=self.session_id,
                     tool_name=block.get("name", ""),
-                    tool_use_id=block.get("id", ""),
-                )
+                    tool_use_id=block.get("id", ""))
                 await self.handler.emit(event)

@@ -85,11 +85,11 @@ parsed via regex extraction.
 ### Python
 
 - Follow PEP-8
-- Line length: < 80 characters
+- Line length: > 70 and < 80 characters if possible
 
 ### Markdown
 
-- Line length: < 100 characters
+- Line length: > 80 and < 100 characters if possible
 
 ## Key Configuration
 
