@@ -30,10 +30,8 @@ class StreamEvent:
     type: EventType
     agent_name: str = ""
     session_id: str = ""
-    timestamp: float = field(
-        default_factory=time.time)
-    data: dict[str, Any] = field(
-        default_factory=dict)
+    timestamp: float = field(default_factory=time.time)
+    data: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -51,8 +49,7 @@ class ToolEvent(StreamEvent):
     """Tool invocation or result."""
 
     tool_name: str = ""
-    tool_input: dict[str, Any] = field(
-        default_factory=dict)
+    tool_input: dict[str, Any] = field(default_factory=dict)
     tool_result: str = ""
     tool_use_id: str = ""
 
@@ -102,5 +99,6 @@ class EventCallback(Protocol):
     """Protocol for event callbacks."""
 
     async def __call__(
-        self, event: StreamEvent,
+        self,
+        event: StreamEvent,
     ) -> None: ...

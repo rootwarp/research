@@ -68,7 +68,8 @@ defined with specific tool permissions via `ClaudeAgentOptions`:
 - **PlannerAgent** (read-only): Read, Glob, Grep, GitHub MCP. Uses `bypassPermissions` mode.
 - **CoderAgent** (read-write): Read, Write, Edit, Glob, Grep, Bash. Uses `acceptEdits` mode.
 
-**Data flow**: Each agent produces a dataclass result (`ResearchResult` → `Plan` → `CodeResult`).
+**Data flow**: Each agent produces a dataclass result
+(`ResearchResult` → `Plan` → `CodeResult`).
 Results are serialized to both JSON and Markdown in their respective directories. The orchestrator
 assembles these into a final `TaskResult`.
 

@@ -52,17 +52,25 @@ async def run_planner(
 
 @click.command()
 @click.option("--working-dir", default=".", help="Working directory.")
-@click.option("--research-dir", default="research",
-              help="Path to research output directory.")
+@click.option(
+    "--research-dir",
+    default="research",
+    help="Path to research output directory.",
+)
 @click.option("--show-thinking", is_flag=True, help="Show agent thinking.")
 @click.option("--show-tools", is_flag=True, help="Show tool usage.")
-def main(working_dir: str, research_dir: str,
-         show_thinking: bool, show_tools: bool) -> None:
+def main(
+    working_dir: str, research_dir: str, show_thinking: bool, show_tools: bool
+) -> None:
     """Run the PlannerAgent in isolation."""
-    asyncio.run(run_planner(
-        working_dir, research_dir,
-        show_thinking, show_tools,
-    ))
+    asyncio.run(
+        run_planner(
+            working_dir,
+            research_dir,
+            show_thinking,
+            show_tools,
+        )
+    )
 
 
 if __name__ == "__main__":

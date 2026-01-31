@@ -204,7 +204,8 @@ coder_def = coder.get_agent_definition()
 
 ## GitHub MCP Integration
 
-The Planner agent can use GitHub MCP to gather context from repositories and issues. Configure it in `.mcp.json`:
+The Planner agent can use GitHub MCP to gather context
+from repositories and issues. Configure it in `.mcp.json`:
 
 ```json
 {

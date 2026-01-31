@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
-import json, sys
+import json
+import sys
 from collections import defaultdict
 from typing import Callable, Awaitable
 
 from .events import (
-    EventType, StreamEvent, TextEvent,
-    ToolEvent, ThinkingEvent, PhaseEvent,
+    EventType,
+    StreamEvent,
+    TextEvent,
+    ToolEvent,
+    ThinkingEvent,
+    PhaseEvent,
 )
 
-EventCallbackFn = Callable[
-    [StreamEvent], Awaitable[None]]
+EventCallbackFn = Callable[[StreamEvent], Awaitable[None]]
 
 
 class StreamHandler:
@@ -20,32 +24,36 @@ class StreamHandler:
 
     def __init__(self) -> None:
         self._callbacks: dict[
-            EventType, list[EventCallbackFn],
+            EventType,
+            list[EventCallbackFn],
         ] = defaultdict(list)
-        self._global_callbacks: list[
-            EventCallbackFn] = []
+        self._global_callbacks: list[EventCallbackFn] = []
 
     def on(
-        self, event_type: EventType,
+        self,
+        event_type: EventType,
         callback: EventCallbackFn,
     ) -> None:
         """Register a callback for an event type."""
         self._callbacks[event_type].append(callback)
 
     def on_all(
-        self, callback: EventCallbackFn,
+        self,
+        callback: EventCallbackFn,
     ) -> None:
         """Register a callback for all events."""
         self._global_callbacks.append(callback)
 
     async def emit(
-        self, event: StreamEvent,
+        self,
+        event: StreamEvent,
     ) -> None:
         """Dispatch event to matching callbacks."""
         for cb in self._global_callbacks:
             await cb(event)
         for cb in self._callbacks.get(
-            event.type, [],
+            event.type,
+            [],
         ):
             await cb(event)
 
@@ -54,7 +62,8 @@ class DefaultStreamRenderer:
     """Default CLI renderer for streaming events."""
 
     def __init__(
-        self, show_thinking: bool = False,
+        self,
+        show_thinking: bool = False,
         show_tools: bool = False,
         json_events: bool = False,
     ) -> None:
@@ -79,7 +88,7 @@ class DefaultStreamRenderer:
 
     async def _handle_json(self, event: StreamEvent) -> None:
         """Output event as JSON line."""
-        data: dict = {
+        data: dict[str, object] = {
             "type": event.type.value,
             "agent": event.agent_name,
             "timestamp": event.timestamp,

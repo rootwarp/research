@@ -1,20 +1,31 @@
 """AI Agents for coding tasks."""
 
-from .researcher import ResearcherAgent
-from .planner import PlannerAgent
-from .detail_planner import DetailPlannerAgent
+from __future__ import annotations
+
+from typing import Any
+
+from claude_agent_sdk import SystemMessage
+
 from .coder import CoderAgent
+from .detail_planner import DetailPlannerAgent
+from .planner import PlannerAgent
+from .researcher import ResearcherAgent
 
 __all__ = [
-    "ResearcherAgent", "PlannerAgent", "DetailPlannerAgent", "CoderAgent",
+    "ResearcherAgent",
+    "PlannerAgent",
+    "DetailPlannerAgent",
+    "CoderAgent",
 ]
 
 
 def warn_mcp(
-    message: object, verbose: bool,
+    message: SystemMessage,
+    verbose: bool,
 ) -> None:
     """Warn about disconnected MCP servers."""
-    servers = message.data.get("mcp_servers", [])
+    data: dict[str, Any] = getattr(message, "data", {})
+    servers = data.get("mcp_servers", [])
     for server in servers:
         status = server.get("status")
         name = server.get("name")

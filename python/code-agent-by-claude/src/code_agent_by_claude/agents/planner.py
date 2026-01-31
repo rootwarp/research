@@ -4,15 +4,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ..stream_handler import StreamHandler
+
 from claude_agent_sdk import (
-    query, ClaudeAgentOptions, AgentDefinition,
-    ResultMessage, AssistantMessage,
+    query,
+    ClaudeAgentOptions,
+    AgentDefinition,
+    ResultMessage,
+    AssistantMessage,
 )
 
 
 @dataclass
 class Plan:
     """Implementation plan from the planner agent."""
+
     content: str
 
     def save_to_dir(self, plans_dir: str | Path) -> Path:
@@ -69,25 +78,28 @@ class PlannerAgent:
         self.working_dir = working_dir
         self.system_prompt = PLANNER_SYSTEM_PROMPT
 
-    def get_agent_definition(self) -> dict:
+    def get_agent_definition(self) -> dict[str, Any]:
         """Return the agent definition for SDK."""
         return {
             "description": (
                 "Expert software architect that "
                 "analyzes requirements and creates "
-                "detailed implementation plans."),
+                "detailed implementation plans."
+            ),
             "prompt": self.system_prompt,
             "tools": ["Read", "Glob", "Grep"],
         }
 
     async def run(
-        self, verbose: bool,
+        self,
+        verbose: bool,
         research_dir: str | Path = "research",
-        stream_handler: object | None = None,
+        stream_handler: StreamHandler | None = None,
         include_partial: bool = False,
     ) -> Plan | None:
         """Run the planner agent."""
         from ..message_processor import MessageProcessor
+
         planner_prompt = (
             "Create a detailed implementation plan for this coding task.\n\n"
             f"Working directory: {self.working_dir}\n\n"
@@ -108,7 +120,9 @@ class PlannerAgent:
         allowed_tools = ["Read", "Glob", "Grep", "Task"]
         processor = (
             MessageProcessor(stream_handler, "planner")
-            if stream_handler else None)
+            if stream_handler
+            else None
+        )
         try:
             opts = ClaudeAgentOptions(
                 allowed_tools=allowed_tools,
@@ -119,8 +133,7 @@ class PlannerAgent:
             )
             if include_partial:
                 opts.include_partial_messages = True
-            async for message in query(
-                prompt=planner_prompt, options=opts):
+            async for message in query(prompt=planner_prompt, options=opts):
                 if processor:
                     await processor.process(message)
                 if isinstance(message, AssistantMessage):
@@ -133,20 +146,22 @@ class PlannerAgent:
                         if verbose and not stream_handler:
                             print(chunk, end="", flush=True)
 
-                if not (isinstance(message, ResultMessage)
-                        and message.subtype == "success"):
+                if not (
+                    isinstance(message, ResultMessage)
+                    and message.subtype == "success"
+                ):
                     continue
 
-                result_text = message.result
+                result_text = message.result or ""
                 if verbose and not stream_handler:
                     print(message.result)
 
             result = Plan(content=result_text)
-            plans_dir = "/".join([(Path(self.working_dir) / "plans")])
-            result.save_to_dir(plans_dir)
+            plans_path = Path(self.working_dir) / "plans"
+            result.save_to_dir(plans_path)
 
             if verbose:
-                print(f"\nPlan saved to: {plans_dir / 'plan.md'}")
+                print(f"\nPlan saved to: {plans_path / 'plan.md'}")
 
             return result
         except Exception as e:

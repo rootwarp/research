@@ -15,7 +15,8 @@ from code_agent_by_claude.stream_handler import (
 
 
 async def run_researcher(
-    task: str, working_dir: str = ".",
+    task: str,
+    working_dir: str = ".",
     show_thinking: bool = False,
     show_tools: bool = False,
 ) -> None:
@@ -33,7 +34,8 @@ async def run_researcher(
     handler = renderer.create_handler()
 
     result = await agent.run(
-        task=task, verbose=False,
+        task=task,
+        verbose=False,
         stream_handler=handler,
         include_partial=True,
     )
@@ -53,13 +55,18 @@ async def run_researcher(
 @click.option("--working-dir", default=".", help="Working directory.")
 @click.option("--show-thinking", is_flag=True, help="Show agent thinking.")
 @click.option("--show-tools", is_flag=True, help="Show tool usage.")
-def main(task: str, working_dir: str,
-         show_thinking: bool, show_tools: bool) -> None:
+def main(
+    task: str, working_dir: str, show_thinking: bool, show_tools: bool
+) -> None:
     """Run the ResearcherAgent in isolation."""
-    asyncio.run(run_researcher(
-        task, working_dir,
-        show_thinking, show_tools,
-    ))
+    asyncio.run(
+        run_researcher(
+            task,
+            working_dir,
+            show_thinking,
+            show_tools,
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -24,12 +24,16 @@ async def run_detail_planner(
     print("-" * 40)
 
     renderer = DefaultStreamRenderer(
-        show_thinking=show_thinking,
-        show_tools=show_tools)
+        show_thinking=show_thinking, show_tools=show_tools
+    )
     handler = renderer.create_handler()
 
-    result = await agent.run(verbose=False, plans_dir=plans_dir,
-        stream_handler=handler, include_partial=True)
+    result = await agent.run(
+        verbose=False,
+        plans_dir=plans_dir,
+        stream_handler=handler,
+        include_partial=True,
+    )
 
     print("\n" + "=" * 40)
 
@@ -50,11 +54,13 @@ async def run_detail_planner(
 @click.option("--plans-dir", default="plans", help="Path to plans directory.")
 @click.option("--show-thinking", is_flag=True, help="Show agent thinking.")
 @click.option("--show-tools", is_flag=True, help="Show tool usage.")
-def main(working_dir: str, plans_dir: str,
-         show_thinking: bool, show_tools: bool) -> None:
+def main(
+    working_dir: str, plans_dir: str, show_thinking: bool, show_tools: bool
+) -> None:
     """Run the DetailPlannerAgent in isolation."""
-    asyncio.run(run_detail_planner(
-        working_dir, plans_dir, show_thinking, show_tools))
+    asyncio.run(
+        run_detail_planner(working_dir, plans_dir, show_thinking, show_tools)
+    )
 
 
 if __name__ == "__main__":
