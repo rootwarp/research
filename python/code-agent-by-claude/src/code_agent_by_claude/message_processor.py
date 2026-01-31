@@ -32,6 +32,7 @@ class MessageProcessor:
         self.handler = handler
         self.agent_name = agent_name
         self.session_id = session_id
+        self._seen_text_len = 0
 
     async def process(self, message: object) -> None:
         """Process a single SDK message."""
@@ -63,15 +64,25 @@ class MessageProcessor:
         message: AssistantMessage,
     ) -> None:
         event: StreamEvent
+        full_text = ""
         for block in message.content:
             if hasattr(block, "text"):
-                event = TextEvent(
-                    type=EventType.TEXT_DELTA,
-                    agent_name=self.agent_name,
-                    session_id=self.session_id,
-                    text=block.text,
-                )
-                await self.handler.emit(event)
+                full_text += block.text
+        if len(full_text) < self._seen_text_len:
+            self._seen_text_len = 0
+        if full_text and len(full_text) > self._seen_text_len:
+            delta = full_text[self._seen_text_len:]
+            self._seen_text_len = len(full_text)
+            event = TextEvent(
+                type=EventType.TEXT_DELTA,
+                agent_name=self.agent_name,
+                session_id=self.session_id,
+                text=delta,
+            )
+            await self.handler.emit(event)
+        for block in message.content:
+            if hasattr(block, "text"):
+                continue
             elif hasattr(block, "name") and hasattr(block, "input"):
                 event = ToolEvent(
                     type=EventType.TOOL_START,

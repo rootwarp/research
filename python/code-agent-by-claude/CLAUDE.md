@@ -86,16 +86,20 @@ parsed via regex extraction.
 ### Python
 
 - Follow PEP-8
-- Line length: > 70 and < 80 characters if possible
+- Target line length: 75-79 characters. Fill lines as close to 79 as possible.
+  Do NOT break lines early at 40-60 characters when they can fit within 79.
+  Only break below 75 when a natural token boundary requires it.
+- Avoid unnecessary line separation
 
 ### Markdown
 
-- Line length: > 80 and < 100 characters if possible
+- Target line length: 85-99 characters. Fill lines as close to 99 as possible.
+  Do NOT break lines early when they can fit within 99.
+- Avoid unnecessary line separation
 
 ## Key Configuration
 
 - **Python**: >=3.10
-- **Line length**: 80 (black/ruff)
 - **Type checking**: mypy strict mode
 - **Runtime dependency**: `claude-agent-sdk>=0.1.0`
 - **Environment variables**: `ANTHROPIC_API_KEY` (required),

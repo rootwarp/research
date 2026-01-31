@@ -1,9 +1,9 @@
 """AI Coding Agents using Claude Agent SDK."""
 
-from .agents import PlannerAgent, DetailPlannerAgent, CoderAgent
+from .agents import PlannerAgent, DetailPlannerAgent, CoderAgent, ReviewerAgent
 from .agents.planner import Plan
-from .agents.detail_planner import DetailPlan
 from .agents.coder import CodeResult
+from .agents.reviewer import ReviewResult
 from .events import (
     EventType,
     StreamEvent,
@@ -27,9 +27,10 @@ __all__ = [
     "PlannerAgent",
     "DetailPlannerAgent",
     "CoderAgent",
+    "ReviewerAgent",
     "Plan",
-    "DetailPlan",
     "CodeResult",
+    "ReviewResult",
     "Orchestrator",
     "TaskResult",
     "run_coding_task",

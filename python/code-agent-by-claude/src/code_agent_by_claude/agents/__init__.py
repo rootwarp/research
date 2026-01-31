@@ -10,12 +10,14 @@ from .coder import CoderAgent
 from .detail_planner import DetailPlannerAgent
 from .planner import PlannerAgent
 from .researcher import ResearcherAgent
+from .reviewer import ReviewerAgent
 
 __all__ = [
     "ResearcherAgent",
     "PlannerAgent",
     "DetailPlannerAgent",
     "CoderAgent",
+    "ReviewerAgent",
 ]
 
 

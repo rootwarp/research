@@ -37,16 +37,10 @@ async def run_detail_planner(
 
     print("\n" + "=" * 40)
 
-    if result is None:
-        print("Detail planner returned no result.")
-        return
-
-    print(f"[Detail Plan] {len(result.parts)} parts")
-    for part in result.parts:
-        print(f"  {part.sequence:02d}: {part.title}")
-
-    print("\n[TODO]")
-    print(result.todo_content)
+    if result:
+        print("[Detail Plan] Completed successfully.")
+    else:
+        print("[Detail Plan] Failed.")
 
 
 @click.command()

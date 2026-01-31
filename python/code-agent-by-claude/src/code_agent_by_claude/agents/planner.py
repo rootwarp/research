@@ -53,10 +53,11 @@ technical context, and recommendations
 3. **Explore the existing codebase** if needed:
    - Use Read, Glob, and Grep tools
 
-4. **Create a detailed implementation plan**:
+4. **Create an overall implementation plan**:
    - Identify files to create or modify
-   - Break down into clear, actionable steps
    - Identify dependencies or prerequisites
+   - Break down into clear, actionable steps
+   - Identify implementation phases to build the target application incrementally
 
 Output your plan as a well-structured markdown document covering:
 - Task description
@@ -66,9 +67,8 @@ Output your plan as a well-structured markdown document covering:
 - Dependencies
 - Any additional notes
 
-Focus on clarity and completeness. The coder \
-agent will read this plan to implement the \
-solution."""
+Focus on clarity and completeness.
+The coder agent will read this plan to implement the solution."""
 
 
 class PlannerAgent:
@@ -82,9 +82,8 @@ class PlannerAgent:
         """Return the agent definition for SDK."""
         return {
             "description": (
-                "Expert software architect that "
-                "analyzes requirements and creates "
-                "detailed implementation plans."
+                "Expert software architect that analyzes requirements and"
+                " creates overall implementation plans."
             ),
             "prompt": self.system_prompt,
             "tools": ["Read", "Glob", "Grep"],
@@ -102,52 +101,76 @@ class PlannerAgent:
 
         planner_prompt = (
             "Create a detailed implementation plan for this coding task.\n\n"
-            f"Working directory: {self.working_dir}\n\n"
+            f"Working directory: {self.working_dir}/docs/plans\n\n"
             "IMPORTANT: First, read the research materials:\n"
             f'1. Read "{research_dir}/research.md" for research findings\n\n'
             "The research contains:\n"
             "- Original requirements\n"
             "- Requirements analysis\n"
-            "- Technical context about the existing "
-            "codebase\n"
+            "- Technical context about the existing codebase\n"
             "- Recommendations from the researcher\n\n"
-            "Based on the research findings, "
-            "create a comprehensive implementation plan.\n"
+            "Based on the research findings, create a comprehensive implementation plan.\n"
             "If additional exploration is needed, use the available tools.\n"
             "Output your plan in markdown format."
         )
         result_text = ""
-        allowed_tools = ["Read", "Glob", "Grep", "Task"]
+        prev_text_len = 0
+        allowed_tools = [
+            "Read", "Write", "Edit", "Glob", "Grep",
+        ]
         processor = (
-            MessageProcessor(stream_handler, "planner")
-            if stream_handler
-            else None
+            MessageProcessor(
+                stream_handler, "planner"
+            )
+            if stream_handler else None
         )
         try:
             opts = ClaudeAgentOptions(
                 allowed_tools=allowed_tools,
                 permission_mode="bypassPermissions",
                 agents={
-                    "planner": AgentDefinition(**self.get_agent_definition())
+                    "planner": AgentDefinition(
+                        **self.get_agent_definition()
+                    )
                 },
             )
             if include_partial:
                 opts.include_partial_messages = True
-            async for message in query(prompt=planner_prompt, options=opts):
+            async for message in query(
+                prompt=planner_prompt, options=opts
+            ):
                 if processor:
                     await processor.process(message)
-                if isinstance(message, AssistantMessage):
+                if isinstance(
+                    message, AssistantMessage
+                ):
+                    full = ""
                     for block in message.content:
-                        chunk = getattr(block, "text", None)
-                        if chunk is None:
-                            continue
-
-                        result_text += chunk
-                        if verbose and not stream_handler:
-                            print(chunk, end="", flush=True)
+                        chunk = getattr(
+                            block, "text", None
+                        )
+                        if chunk is not None:
+                            full += chunk
+                    if len(full) < prev_text_len:
+                        prev_text_len = 0
+                    if len(full) > prev_text_len:
+                        delta = full[prev_text_len:]
+                        prev_text_len = len(full)
+                        result_text = full
+                        if (
+                            verbose
+                            and not stream_handler
+                        ):
+                            print(
+                                delta,
+                                end="",
+                                flush=True,
+                            )
 
                 if not (
-                    isinstance(message, ResultMessage)
+                    isinstance(
+                        message, ResultMessage
+                    )
                     and message.subtype == "success"
                 ):
                     continue
@@ -156,16 +179,8 @@ class PlannerAgent:
                 if verbose and not stream_handler:
                     print(message.result)
 
-            result = Plan(content=result_text)
-            plans_path = Path(self.working_dir) / "plans"
-            result.save_to_dir(plans_path)
-
-            if verbose:
-                print(f"\nPlan saved to: {plans_path / 'plan.md'}")
-
-            return result
+            return Plan(content=result_text)
         except Exception as e:
             if verbose:
                 print(f"Error in planner: {e}")
-
             return None

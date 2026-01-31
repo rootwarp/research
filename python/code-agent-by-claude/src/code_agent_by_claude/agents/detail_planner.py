@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import re
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -11,172 +9,98 @@ if TYPE_CHECKING:
     from ..stream_handler import StreamHandler
 
 from claude_agent_sdk import (
-    AgentDefinition,
-    AssistantMessage,
-    ClaudeAgentOptions,
-    ResultMessage,
-    query,
+    AgentDefinition, AssistantMessage,
+    ClaudeAgentOptions, ResultMessage, query,
 )
 
 
-@dataclass
-class DetailPlanPart:
-    """A single part of a detailed plan."""
-
-    sequence: int
-    title: str
-    content: str
-
-
-@dataclass
-class DetailPlan:
-    """Fine-grained implementation plan."""
-
-    parts: list[DetailPlanPart] = field(default_factory=list)
-    todo_content: str = ""
-
-    def save_to_dir(self, detail_plans_dir: str | Path) -> Path:
-        """Save each part and TODO.md."""
-        path = Path(detail_plans_dir)
-        path.mkdir(parents=True, exist_ok=True)
-
-        for part in self.parts:
-            slug = _slugify(part.title)
-            fname = f"{part.sequence:02d}_{slug}.md"
-            with open(path / fname, "w") as f:
-                f.write(part.content)
-
-        with open(path / "TODO.md", "w") as f:
-            f.write(self.todo_content)
-
-        return path
-
-
-def _slugify(title: str) -> str:
-    """Convert title to a filename-safe slug."""
-    slug = title.lower().strip()
-    slug = re.sub(r"[^a-z0-9]+", "_", slug)
-    slug = slug.strip("_")
-    return slug
-
-
-DETAIL_PLANNER_SYSTEM_PROMPT = """\
-You are an expert software architect who breaks \
-high-level plans into small, self-contained \
-implementation parts.
-
-When given a plan:
-1. **Read the plan** from the plans directory:
-   - Read `plans/plan.md` for the implementation plan
-
-2. **Explore the codebase** as needed:
-   - Use Read, Glob, and Grep tools to understand \
-existing code structure
-
-3. **Break the plan into small parts**:
-   - Each part should be small enough to have \
-minimal side effects
-   - Each part should be independently reviewable
-   - Parts should be ordered by dependency \
-(prerequisite parts first)
-   - For each part describe: scope, files affected, \
-detailed changes, potential side effects
-
-4. **Write each part to a separate markdown file** \
-in the `detail_plans/` directory:
-   - Name files as `01_<slug>.md`, `02_<slug>.md`, etc.
-   - Use the Write tool to create each file
-
-5. **Write a TODO checklist** to \
-`detail_plans/TODO.md` using the Write tool.
-
-Each part file should use this structure:
-
-```markdown
-## 01: Title
-
-- **Scope**: What this part covers
-- **Files**: Files to create or modify
-- **Changes**: Detailed step-by-step changes
-- **Side effects**: Potential side effects \
-and mitigations
-```
-
-The TODO file should use this structure:
-
-```markdown
-# Implementation TODO
-
-- [ ] 01: <title>
-- [ ] 02: <title>
-```
-
-Example part file (`detail_plans/01_add_data_models.md`):
-
-```markdown
-## 01: Add data models
-
-- **Scope**: Create new model classes
-- **Files**: `src/models.py` (create)
-- **Changes**: Define User and Role dataclasses
-- **Side effects**: None
-```
-
-Example part file \
-(`detail_plans/02_update_api_endpoints.md`):
-
-```markdown
-## 02: Update API endpoints
-
-- **Scope**: Wire models to API layer
-- **Files**: `src/api.py` (modify)
-- **Changes**: Add CRUD endpoints for User
-- **Side effects**: Requires models from part 01
-```
-
-Example TODO file (`detail_plans/TODO.md`):
-
-```markdown
-# Implementation TODO
-
-- [ ] 01: Add data models
-- [ ] 02: Update API endpoints
-```"""
-
-
-_PART_HEADER_RE = re.compile(r"^##\s+(\d+)[.:]\s*(.+)$", re.MULTILINE)
-_TODO_SECTION_RE = re.compile(r"^#\s+Implementation\s+TODO\s*$", re.MULTILINE)
-
-
-def _parse_detail_plan(text: str) -> DetailPlan | None:
-    """Parse markdown output into a DetailPlan."""
-    if not text or not text.strip():
-        return None
-
-    headers = list(_PART_HEADER_RE.finditer(text))
-    if not headers:
-        return None
-
-    todo_match = _TODO_SECTION_RE.search(text)
-    todo_content = ""
-    content_end = len(text)
-    if todo_match:
-        todo_content = text[todo_match.start() :].strip()
-        content_end = todo_match.start()
-
-    parts: list[DetailPlanPart] = []
-    for i, match in enumerate(headers):
-        seq = int(match.group(1))
-        title = match.group(2).strip()
-        start = match.start()
-        if i + 1 < len(headers):
-            end = headers[i + 1].start()
-        else:
-            end = content_end
-        body = text[start:end].strip()
-        parts.append(DetailPlanPart(sequence=seq, title=title, content=body))
-
-    return DetailPlan(parts=parts, todo_content=todo_content)
+DETAIL_PLANNER_SYSTEM_PROMPT = (
+    "You are an expert software architect who breaks high-level"
+    " plans into small, self-contained implementation parts"
+    " using strict TDD workflow.\n\n"
+    "When given a plan:\n"
+    "1. **Read the plan** from the plans directory:\n"
+    "   - Read `plans/plan.md` for the implementation plan\n\n"
+    "2. **Explore the codebase** as needed:\n"
+    "   - Use Read, Glob, and Grep tools"
+    " to understand existing code structure\n\n"
+    "3. **Break the plan into small parts**:\n"
+    "   - Each part should be small enough"
+    " to have minimal side effects\n"
+    "   - Each part should be independently reviewable\n"
+    "   - Each part should update less than 1,000 lines"
+    " of code if possible (except testcases)\n"
+    "   - Parts should be ordered by dependency"
+    " (prerequisite parts first)\n"
+    "   - Parts aligned as building the complete software"
+    " incrementally. Do not break test and build.\n\n"
+    "4. **Write each part to a separate markdown file**"
+    " in the `detail_plans/` directory:\n"
+    "   - Name files as `01_<slug>.md`,"
+    " `02_<slug>.md`, etc.\n"
+    "   - Use the Write tool to create each file\n\n"
+    "Each part file should use this structure:\n"
+    "```markdown\n"
+    "## 01: Title\n\n"
+    "- **Scope**: What this part covers\n"
+    "- **Tests**: What tests to write or update,"
+    " including edge cases\n"
+    "- **Files**: Files to create or modify\n"
+    "- **Changes**: Detailed step-by-step changes\n"
+    "- **Side effects**: Potential side effects"
+    " and mitigations\n"
+    "```\n\n"
+    "5. **Write a TODO checklist** to `detail_plans/TODO.md`"
+    " using the Write tool.\n\n"
+    "The TODO.md MUST be a single flat numbered list. Do NOT"
+    " use nested bullets, headers per part, sub-sections, or"
+    " any hierarchical grouping. Reference the part number"
+    " inline (e.g., `[Part 2]`) instead.\n\n"
+    "Follow strict TDD (Red -> Green -> Refactor) ordering."
+    " For each feature or change, produce three sequential"
+    " items:\n\n"
+    "- **RED**: Write a failing test that specifies the"
+    " expected behavior. The test MUST fail at this point"
+    " because the implementation does not exist yet.\n"
+    "- **GREEN**: Write the minimal implementation code to"
+    " make the failing test pass. No more, no less.\n"
+    "- **REFACTOR**: Clean up both implementation and test"
+    " code while keeping all tests green.\n\n"
+    "NEVER group all tests at the end. Every implementation"
+    " item MUST be immediately preceded by its corresponding"
+    " test item.\n\n"
+    "WRONG format (do NOT do this):\n"
+    "```markdown\n"
+    "## Part 2: Shared Types\n"
+    "- [ ] Implement PartyId and ThresholdParams\n"
+    "- [ ] Implement SessionId and CeremonyType\n"
+    "- [ ] Write unit tests for ThresholdParams\n"
+    "```\n\n"
+    "CORRECT format (use this exactly):\n"
+    "```markdown\n"
+    "# Implementation TODO\n\n"
+    "- [ ] 01: RED - [Part 1] Write test for"
+    " workspace build and clippy pass\n"
+    "- [ ] 02: GREEN - [Part 1] Create root"
+    " Cargo.toml and crate skeletons\n"
+    "- [ ] 03: REFACTOR - [Part 1] Clean up workspace config\n"
+    "- [ ] 04: RED - [Part 2] Write test for"
+    " PartyId creation and display\n"
+    "- [ ] 05: GREEN - [Part 2] Implement PartyId struct\n"
+    "- [ ] 06: REFACTOR - [Part 2] Extract"
+    " common ID validation\n"
+    "- [ ] 07: RED - [Part 2] Write test for"
+    " ThresholdParams validation rules\n"
+    "- [ ] 08: GREEN - [Part 2] Implement"
+    " ThresholdParams with validation\n"
+    "- [ ] 09: REFACTOR - [Part 2] Clean up"
+    " ThresholdParams error messages\n"
+    "```\n\n"
+    "Each RED/GREEN/REFACTOR triple must target a single"
+    " function, struct, or behavior. If an item covers more"
+    " than one public API surface, split it into separate"
+    " triples.\n"
+)
 
 
 class DetailPlannerAgent:
@@ -190,44 +114,48 @@ class DetailPlannerAgent:
         """Return the agent definition for SDK."""
         return {
             "description": (
-                "Expert architect that breaks"
-                " implementation plans into small,"
-                " self-contained parts."
+                "Expert architect that breaks implementation"
+                " plans into small, self-contained parts."
             ),
             "prompt": self.system_prompt,
             "tools": ["Read", "Write", "Glob", "Grep"],
         }
 
     async def run(
-        self,
-        verbose: bool,
+        self, verbose: bool,
         plans_dir: str | Path = "plans",
         stream_handler: StreamHandler | None = None,
         include_partial: bool = False,
-    ) -> DetailPlan | None:
-        """Run the detail planner agent."""
+    ) -> bool:
+        """Run the detail planner agent.
+
+        Returns:
+            True if the agent completed successfully.
+        """
         from ..message_processor import MessageProcessor
 
         prompt = (
-            "Break the implementation plan into"
-            " small, self-contained parts.\n\n"
+            "Break the implementation plan into small,"
+            " self-contained parts.\n\n"
             f"Working directory: {self.working_dir}\n\n"
             "IMPORTANT: First, read the plan:\n"
             f'1. Read "{plans_dir}/plan.md"\n\n'
-            "Then explore the codebase as needed"
-            " and produce the detailed parts.\n"
-            "Write each part as a separate markdown"
-            " file in the detail_plans/ directory.\n"
-            "Also write a TODO.md checklist file"
-            " in the same directory."
+            "Then explore the codebase as needed and produce"
+            " the detailed parts.\n"
+            "Write each part as a separate markdown file in"
+            " the detail_plans/ directory.\n"
+            "Also write a TODO.md checklist file in the"
+            " same directory."
         )
-        result_text = ""
-        allowed_tools = ["Read", "Write", "Glob", "Grep", "Task"]
+        allowed_tools = [
+            "Read", "Write", "Glob", "Grep", "Task",
+        ]
         processor = (
             MessageProcessor(stream_handler, "detail_planner")
-            if stream_handler
-            else None
+            if stream_handler else None
         )
+        success = False
+        prev_text_len = 0
         try:
             opts = ClaudeAgentOptions(
                 allowed_tools=allowed_tools,
@@ -240,36 +168,34 @@ class DetailPlannerAgent:
             )
             if include_partial:
                 opts.include_partial_messages = True
-
-            async for message in query(prompt=prompt, options=opts):
+            async for message in query(
+                prompt=prompt, options=opts
+            ):
                 if processor:
                     await processor.process(message)
                 if isinstance(message, AssistantMessage):
+                    full = ""
                     for block in message.content:
                         chunk = getattr(block, "text", None)
-                        if chunk is None:
-                            continue
-
-                        result_text += chunk
-                        if verbose and not stream_handler:
-                            print(chunk, end="", flush=True)
-
-                if not (
-                    isinstance(message, ResultMessage)
-                    and message.subtype == "success"
-                ):
-                    continue
-
-                result_text = message.result or ""
-                if verbose and not stream_handler:
-                    print(message.result)
-
-            result = _parse_detail_plan(result_text)
-            if result is None and verbose:
-                print("Failed to parse detail plan from agent output.")
-            return result
+                        if chunk is not None:
+                            full += chunk
+                    if len(full) < prev_text_len:
+                        prev_text_len = 0
+                    if (len(full) > prev_text_len
+                            and verbose
+                            and not stream_handler):
+                        print(
+                            full[prev_text_len:],
+                            end="", flush=True,
+                        )
+                        prev_text_len = len(full)
+                if (isinstance(message, ResultMessage)
+                        and message.subtype == "success"):
+                    success = True
+                    if verbose and not stream_handler:
+                        print(message.result)
+            return success
         except Exception as e:
             if verbose:
                 print(f"Error in detail planner: {e}")
-
-            return None
+            return False

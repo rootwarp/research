@@ -26,14 +26,6 @@ class ResearchResult:
 
     content: str
 
-    def save_to_dir(self, research_dir: str | Path) -> Path:
-        """Save research result as markdown."""
-        path = Path(research_dir)
-        path.mkdir(parents=True, exist_ok=True)
-        with open(path / "research.md", "w") as f:
-            f.write(self.content)
-        return path
-
 
 RESEARCHER_SYSTEM_PROMPT = """\
 You are an expert requirements analyst and technical researcher.
@@ -69,8 +61,7 @@ When given a task:
    - Identify potential challenges
    - Make recommendations for the planning phase
 
-Output your research as a well-structured markdown document \
-covering:
+Output your research as a well-structured markdown document covering:
 - Original requirements
 - Requirements analysis
 - Research agenda and findings
@@ -94,11 +85,15 @@ class ResearcherAgent:
         """Return the agent definition for SDK."""
         return {
             "description": (
-                "Expert requirements analyst that researches and understands"
-                " requirements before planning."
+                "Expert requirements analyst that researches"
+                " and understands requirements"
+                " before planning."
             ),
             "prompt": self.system_prompt,
-            "tools": ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
+            "tools": [
+                "Read", "Glob", "Grep",
+                "WebFetch", "WebSearch",
+            ],
         }
 
     async def run(
@@ -109,6 +104,7 @@ class ResearcherAgent:
         include_partial: bool = False,
     ) -> ResearchResult | None:
         """Run the researcher agent."""
+        research_dir = Path(self.working_dir) / "docs" / "research"
         prompt = (
             "Research and analyze the requirements for this coding task.\n\n"
             f"Task: {task}\n\n"
@@ -118,22 +114,20 @@ class ResearcherAgent:
             "2. Create a research agenda\n"
             "3. Research the codebase and gather technical context\n"
             "4. Use web search for unfamiliar technologies or APIs\n"
-            "5. Synthesize findings and provide recommendations\n\n"
+            "5. Synthesize findings and provide recommendations\n"
+            "6. Save your research output as markdown"
+            f" to {research_dir}/research.md\n\n"
             "Output your research in markdown format."
         )
         result_text = ""
+        prev_text_len = 0
         allowed_tools = [
-            "Read",
-            "Glob",
-            "Grep",
-            "Task",
-            "WebFetch",
-            "WebSearch",
+            "Read", "Glob", "Grep",
+            "WebFetch", "WebSearch",
         ]
         processor = (
             MessageProcessor(stream_handler, "researcher")
-            if stream_handler
-            else None
+            if stream_handler else None
         )
         try:
             defn = self.get_agent_definition()
@@ -141,36 +135,52 @@ class ResearcherAgent:
                 allowed_tools=allowed_tools,
                 permission_mode="bypassPermissions",
                 model="opus",
-                agents={"researcher": AgentDefinition(**defn)},
+                agents={
+                    "researcher": AgentDefinition(**defn),
+                },
             )
             if include_partial:
                 opts.include_partial_messages = True
 
-            async for msg in query(prompt=prompt, options=opts):
+            async for msg in query(
+                prompt=prompt, options=opts
+            ):
                 if processor:
                     await processor.process(msg)
                 if isinstance(msg, AssistantMessage):
+                    full = ""
                     for blk in msg.content:
-                        chunk = getattr(blk, "text", None)
-                        if chunk is None:
-                            continue
-                        result_text += chunk
-                        if verbose and not stream_handler:
-                            print(chunk, end="", flush=True)
+                        txt = getattr(
+                            blk, "text", None
+                        )
+                        if txt is not None:
+                            full += txt
+                    if len(full) < prev_text_len:
+                        prev_text_len = 0
+                    if len(full) > prev_text_len:
+                        delta = full[prev_text_len:]
+                        prev_text_len = len(full)
+                        result_text = full
+                        if (
+                            verbose
+                            and not stream_handler
+                        ):
+                            print(
+                                delta,
+                                end="",
+                                flush=True,
+                            )
 
-                if isinstance(msg, ResultMessage) and msg.subtype == "success":
+                is_success = (
+                    isinstance(msg, ResultMessage)
+                    and msg.subtype == "success"
+                )
+                if is_success:
                     result_text = msg.result or ""
                     if verbose and not stream_handler:
                         print(msg.result)
 
-            result = ResearchResult(content=result_text)
-            research_dir = Path(self.working_dir) / "research"
-            result.save_to_dir(research_dir)
-            if verbose:
-                print(
-                    f"\nResearch saved to:" f" {research_dir / 'research.md'}"
-                )
-            return result
+            return ResearchResult(content=result_text)
         except Exception as e:
             if verbose:
                 print(f"Error in researcher: {e}")

@@ -14,8 +14,9 @@ from .agents.researcher import (
     ResearchResult,
 )
 from .agents.planner import PlannerAgent, Plan
-from .agents.detail_planner import DetailPlannerAgent, DetailPlan
+from .agents.detail_planner import DetailPlannerAgent
 from .agents.coder import CoderAgent, CodeResult
+from .agents.reviewer import ReviewerAgent, ReviewResult
 from .events import EventType, PhaseEvent
 from .stream_handler import (
     StreamHandler,
@@ -62,8 +63,8 @@ class TaskResult:
     task: str
     research_result: ResearchResult | None
     plan: Plan | None
-    detail_plan: DetailPlan | None
     code_result: CodeResult | None
+    review_result: ReviewResult | None
     success: bool
     error: str | None = None
 
@@ -81,10 +82,12 @@ class Orchestrator:
         self.research_dir = Path(working_dir) / "research"
         self.plans_dir = Path(working_dir) / "plans"
         self.detail_plans_dir = Path(working_dir) / "detail_plans"
+        self.reviews_dir = Path(working_dir) / "reviews"
         self.researcher = ResearcherAgent(working_dir)
         self.planner = PlannerAgent(working_dir)
         self.detail_planner = DetailPlannerAgent(working_dir)
         self.coder = CoderAgent(working_dir)
+        self.reviewer = ReviewerAgent(working_dir)
         self.mcp_servers = load_mcp_config(working_dir)
         self.stream_handler = stream_handler
         self.include_partial = include_partial_messages
@@ -123,8 +126,9 @@ class Orchestrator:
                 task="",
                 research_result=None,
                 plan=None,
-                detail_plan=None,
+
                 code_result=None,
+                review_result=None,
                 success=False,
                 error="No task or issue URL provided",
             )
@@ -151,8 +155,9 @@ class Orchestrator:
                 task=task_description,
                 research_result=None,
                 plan=None,
-                detail_plan=None,
+
                 code_result=None,
+                review_result=None,
                 success=False,
                 error="Researcher agent failed",
             )
@@ -172,6 +177,7 @@ class Orchestrator:
 
         await self._emit_phase("Planning", EventType.PHASE_START)
         plan = await self.planner.run(
+            task=task_description,
             verbose=verbose,
             research_dir=self.research_dir,
             stream_handler=self.stream_handler,
@@ -184,8 +190,9 @@ class Orchestrator:
                 task=task_description,
                 research_result=research_result,
                 plan=None,
-                detail_plan=None,
+
                 code_result=None,
+                review_result=None,
                 success=False,
                 error="Planner agent failed",
             )
@@ -204,7 +211,7 @@ class Orchestrator:
             print("-" * 40)
 
         await self._emit_phase("Detail Planning", EventType.PHASE_START)
-        detail_plan = await self.detail_planner.run(
+        detail_ok = await self.detail_planner.run(
             verbose=verbose,
             plans_dir=self.plans_dir,
             stream_handler=self.stream_handler,
@@ -212,23 +219,22 @@ class Orchestrator:
         )
         await self._emit_phase("Detail Planning", EventType.PHASE_END)
 
-        if detail_plan is None:
+        if not detail_ok:
             return TaskResult(
                 task=task_description,
                 research_result=research_result,
                 plan=plan,
-                detail_plan=None,
                 code_result=None,
+                review_result=None,
                 success=False,
                 error="Detail planner agent failed",
             )
 
-        detail_plan.save_to_dir(self.detail_plans_dir)
-
         if verbose:
             print("\n[Detail Plan Created]")
-            print(f"Saved to: {self.detail_plans_dir}")
-            print(f"Parts: {len(detail_plan.parts)}")
+            print(
+                f"Saved to: {self.detail_plans_dir}"
+            )
             print("-" * 40)
 
         # Phase 3: Implementation
@@ -252,12 +258,37 @@ class Orchestrator:
                 print(f"Modified: {code_result.files_modified}")
                 print(f"Summary: {code_result.summary}")
 
+        # Phase 4: Code Review
+        if verbose:
+            print("\n[Phase 4] Reviewing...")
+            print("-" * 40)
+
+        await self._emit_phase("Review", EventType.PHASE_START)
+        review_result = await self.reviewer.run(
+            verbose=verbose,
+            stream_handler=self.stream_handler,
+            include_partial=self.include_partial,
+        )
+        await self._emit_phase("Review", EventType.PHASE_END)
+
+        if review_result:
+            review_result.save_to_dir(self.reviews_dir)
+
+        if verbose:
+            print("\n[Review Complete]")
+            if review_result:
+                n = len(review_result.findings)
+                status = "PASS" if review_result.passed else "FAIL"
+                print(f"Result: {status}")
+                print(f"Findings: {n}")
+                print(f"Saved to: {self.reviews_dir}")
+
         return TaskResult(
             task=task_description,
             research_result=research_result,
             plan=plan,
-            detail_plan=detail_plan,
             code_result=code_result,
+            review_result=review_result,
             success=code_result.success if code_result else False,
         )
 
