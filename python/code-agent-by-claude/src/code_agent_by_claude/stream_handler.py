@@ -70,6 +70,7 @@ class DefaultStreamRenderer:
         self.show_thinking = show_thinking
         self.show_tools = show_tools
         self.json_events = json_events
+        self._after_tool = False
 
     def create_handler(self) -> StreamHandler:
         """Create a StreamHandler for this renderer."""
@@ -77,12 +78,30 @@ class DefaultStreamRenderer:
         if self.json_events:
             handler.on_all(self._handle_json)
         else:
-            handler.on(EventType.PHASE_START, self._handle_phase)
-            handler.on(EventType.PHASE_END, self._handle_phase)
-            handler.on(EventType.TEXT_DELTA, self._handle_text)
-            handler.on(EventType.TOOL_START, self._handle_tool)
-            handler.on(EventType.TOOL_RESULT, self._handle_tool)
-            handler.on(EventType.THINKING, self._handle_thinking)
+            handler.on(
+                EventType.PHASE_START,
+                self._handle_phase,
+            )
+            handler.on(
+                EventType.PHASE_END,
+                self._handle_phase,
+            )
+            handler.on(
+                EventType.TEXT_DELTA,
+                self._handle_text,
+            )
+            handler.on(
+                EventType.TOOL_START,
+                self._handle_tool,
+            )
+            handler.on(
+                EventType.TOOL_RESULT,
+                self._handle_tool,
+            )
+            handler.on(
+                EventType.THINKING,
+                self._handle_thinking,
+            )
 
         return handler
 
@@ -118,20 +137,55 @@ class DefaultStreamRenderer:
         else:
             print(f"[{event.phase}] Done.", file=sys.stderr)
 
-    async def _handle_text(self, event: StreamEvent) -> None:
-        if isinstance(event, TextEvent):
-            print(event.text, end="", flush=True)
-
-    async def _handle_tool(self, event: StreamEvent) -> None:
-        if not self.show_tools:
+    async def _handle_text(
+        self, event: StreamEvent,
+    ) -> None:
+        if not isinstance(event, TextEvent):
             return
+        if self._after_tool:
+            print("\n", flush=True)
+            self._after_tool = False
+        print(event.text, end="", flush=True)
+
+    @staticmethod
+    def _tool_summary(event: ToolEvent) -> str:
+        """Build a short summary from tool input."""
+        inp = event.tool_input
+        if not inp:
+            return ""
+        for key in (
+            "file_path", "path", "pattern",
+            "command", "query", "url", "glob",
+        ):
+            val = inp.get(key)
+            if val and isinstance(val, str):
+                if len(val) > 80:
+                    return val[:77] + "..."
+                return val
+        return ""
+
+    async def _handle_tool(
+        self, event: StreamEvent,
+    ) -> None:
         if not isinstance(event, ToolEvent):
             return
         if event.type == EventType.TOOL_START:
-            print(f"\n  [Tool: {event.tool_name}]", file=sys.stderr)
-        else:
+            summary = self._tool_summary(event)
+            label = (
+                f"{event.tool_name} {summary}"
+                if summary else event.tool_name
+            )
+            print(
+                f"\n  > {label}",
+                file=sys.stderr, flush=True,
+            )
+            self._after_tool = True
+        elif self.show_tools:
             snippet = event.tool_result[:120]
-            print(f"  [Result: {snippet}]", file=sys.stderr)
+            print(
+                f"  = {snippet}",
+                file=sys.stderr, flush=True,
+            )
 
     async def _handle_thinking(self, event: StreamEvent) -> None:
         if not self.show_thinking:

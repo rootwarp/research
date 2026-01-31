@@ -10,68 +10,18 @@ if TYPE_CHECKING:
     from ..stream_handler import StreamHandler
 
 from claude_agent_sdk import (
-    query,
-    ClaudeAgentOptions,
-    AgentDefinition,
-    ResultMessage,
-    AssistantMessage,
+    AgentDefinition, AssistantMessage,
+    ClaudeAgentOptions, ResultMessage, query,
 )
 
 from ..message_processor import MessageProcessor
+from .prompts import load_prompt
 
 
 @dataclass
 class ResearchResult:
     """Research findings from the researcher agent."""
-
     content: str
-
-
-RESEARCHER_SYSTEM_PROMPT = """\
-You are an expert requirements analyst and technical researcher.
-
-Your job is to thoroughly understand and research \
-requirements before any planning or implementation.
-
-When given a task:
-
-1. **Read and Extract Requirements**
-   - Extract all explicit and implicit requirements
-
-2. **Analyze Requirements Step by Step**
-   - Break down into distinct, actionable items
-   - Identify ambiguities or missing information
-   - Note constraints or acceptance criteria
-   - Think through dependencies between requirements
-
-3. **Create a Research Agenda**
-   - Identify topics needing research
-   - List technical concepts needing clarification
-   - Note external APIs, libraries, or services
-
-4. **Conduct Research**
-   - Use Read, Glob, and Grep for local codebase
-   - Use WebSearch for documentation and best practices
-   - Use WebFetch to read specific documentation
-   - Gather technical context about architecture
-
-5. **Synthesize Findings**
-   - Summarize learnings for each research topic
-   - Document relevant existing code patterns
-   - Identify potential challenges
-   - Make recommendations for the planning phase
-
-Output your research as a well-structured markdown document covering:
-- Original requirements
-- Requirements analysis
-- Research agenda and findings
-- Technical context
-- Recommendations for the planning phase
-
-Be thorough but focused. The goal is to provide the planner \
-agent with all the context needed to create an accurate \
-implementation plan.
-"""
 
 
 class ResearcherAgent:
@@ -79,15 +29,15 @@ class ResearcherAgent:
 
     def __init__(self, working_dir: str = "."):
         self.working_dir = working_dir
-        self.system_prompt = RESEARCHER_SYSTEM_PROMPT
+        self.system_prompt = load_prompt("researcher")
 
     def get_agent_definition(self) -> dict[str, Any]:
         """Return the agent definition for SDK."""
         return {
             "description": (
-                "Expert requirements analyst that researches"
-                " and understands requirements"
-                " before planning."
+                "Expert requirements analyst that"
+                " researches and understands"
+                " requirements before planning."
             ),
             "prompt": self.system_prompt,
             "tools": [
@@ -97,27 +47,19 @@ class ResearcherAgent:
         }
 
     async def run(
-        self,
-        task: str,
-        verbose: bool,
+        self, task: str, verbose: bool,
         stream_handler: StreamHandler | None = None,
         include_partial: bool = False,
     ) -> ResearchResult | None:
         """Run the researcher agent."""
-        research_dir = Path(self.working_dir) / "docs" / "research"
-        prompt = (
-            "Research and analyze the requirements for this coding task.\n\n"
-            f"Task: {task}\n\n"
-            f"Working directory: {self.working_dir}\n"
-            "Follow these steps:\n"
-            "1. Analyze and break down all requirements step by step\n"
-            "2. Create a research agenda\n"
-            "3. Research the codebase and gather technical context\n"
-            "4. Use web search for unfamiliar technologies or APIs\n"
-            "5. Synthesize findings and provide recommendations\n"
-            "6. Save your research output as markdown"
-            f" to {research_dir}/research.md\n\n"
-            "Output your research in markdown format."
+        research_dir = (
+            Path(self.working_dir) / "docs" / "research"
+        )
+        prompt = load_prompt(
+            "researcher_task",
+            task=task,
+            working_dir=self.working_dir,
+            research_dir=str(research_dir),
         )
         result_text = ""
         prev_text_len = 0
@@ -126,7 +68,9 @@ class ResearcherAgent:
             "WebFetch", "WebSearch",
         ]
         processor = (
-            MessageProcessor(stream_handler, "researcher")
+            MessageProcessor(
+                stream_handler, "researcher"
+            )
             if stream_handler else None
         )
         try:
@@ -136,12 +80,13 @@ class ResearcherAgent:
                 permission_mode="bypassPermissions",
                 model="opus",
                 agents={
-                    "researcher": AgentDefinition(**defn),
+                    "researcher": AgentDefinition(
+                        **defn
+                    ),
                 },
             )
             if include_partial:
                 opts.include_partial_messages = True
-
             async for msg in query(
                 prompt=prompt, options=opts
             ):
@@ -161,16 +106,12 @@ class ResearcherAgent:
                         delta = full[prev_text_len:]
                         prev_text_len = len(full)
                         result_text = full
-                        if (
-                            verbose
-                            and not stream_handler
-                        ):
+                        if (verbose
+                                and not stream_handler):
                             print(
-                                delta,
-                                end="",
+                                delta, end="",
                                 flush=True,
                             )
-
                 is_success = (
                     isinstance(msg, ResultMessage)
                     and msg.subtype == "success"
@@ -179,7 +120,6 @@ class ResearcherAgent:
                     result_text = msg.result or ""
                     if verbose and not stream_handler:
                         print(msg.result)
-
             return ResearchResult(content=result_text)
         except Exception as e:
             if verbose:

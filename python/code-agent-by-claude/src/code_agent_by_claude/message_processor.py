@@ -127,11 +127,18 @@ class MessageProcessor:
         message: ResultMessage,
     ) -> None:
         if message.subtype == "success":
+            text = message.result or ""
+            if not text:
+                return
+            if len(text) <= self._seen_text_len:
+                return
+            delta = text[self._seen_text_len:]
+            self._seen_text_len = len(text)
             event = TextEvent(
                 type=EventType.TEXT_DELTA,
                 agent_name=self.agent_name,
                 session_id=self.session_id,
-                text=message.result or "",
+                text=delta,
             )
             await self.handler.emit(event)
 
@@ -150,11 +157,13 @@ class MessageProcessor:
             delta = raw.get("delta", {})
             delta_type = delta.get("type", "")
             if delta_type == "text_delta":
+                text = delta.get("text", "")
+                self._seen_text_len += len(text)
                 event = TextEvent(
                     type=EventType.TEXT_DELTA,
                     agent_name=self.agent_name,
                     session_id=self.session_id,
-                    text=delta.get("text", ""),
+                    text=text,
                 )
                 await self.handler.emit(event)
             elif delta_type == "thinking_delta":

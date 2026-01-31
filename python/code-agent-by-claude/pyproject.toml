@@ -41,6 +41,9 @@ run-coder = "code_agent_by_claude.run_coder:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"code_agent_by_claude.agents.prompts" = ["*.md"]
+
 [tool.black]
 line-length = 80
 target-version = ["py310"]
