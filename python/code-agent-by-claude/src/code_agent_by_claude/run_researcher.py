@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 import click
 
@@ -51,14 +52,31 @@ async def run_researcher(
 
 
 @click.command()
-@click.option("--task", required=True, help="Coding task description.")
-@click.option("--working-dir", default=".", help="Working directory.")
-@click.option("--show-thinking", is_flag=True, help="Show agent thinking.")
-@click.option("--show-tools", is_flag=True, help="Show tool usage.")
+@click.option(
+    "--task-file",
+    required=True,
+    type=click.Path(exists=True),
+    help="Markdown file containing the task description.",
+)
+@click.option(
+    "--working-dir", default=".", help="Working directory."
+)
+@click.option(
+    "--show-thinking",
+    is_flag=True,
+    help="Show agent thinking.",
+)
+@click.option(
+    "--show-tools", is_flag=True, help="Show tool usage."
+)
 def main(
-    task: str, working_dir: str, show_thinking: bool, show_tools: bool
+    task_file: str,
+    working_dir: str,
+    show_thinking: bool,
+    show_tools: bool,
 ) -> None:
     """Run the ResearcherAgent in isolation."""
+    task = Path(task_file).read_text(encoding="utf-8")
     asyncio.run(
         run_researcher(
             task,

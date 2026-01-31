@@ -32,24 +32,20 @@ class CodeResult:
 
 
 CODER_SYSTEM_PROMPT = """\
-You are an expert software engineer who writes \
-clean, efficient, and well-documented code.
+You are an expert software engineer who writes clean, efficient, and well-documented code.
 
-Your job is to implement code by iterating \
-through the TODO checklist in `detail_plans/`.
+Your job is to implement code by iterating through the TODO checklist in `detail_plans/`.
 
-Repeat the following cycle until every TODO \
-item is marked done:
+Repeat the following cycle until every TODO item is marked done 
+and every each task should be guarantted build and execute correctly:
 
 1. **Read the TODO checklist**:
    - Read `detail_plans/TODO.md`
    - Find the first unchecked item (`- [ ]`)
 
 2. **Read the relevant plan file**:
-   - Open the corresponding detail plan file \
-(e.g., `detail_plans/01_add_data_models.md`)
-   - Understand the scope, files, changes, \
-and side effects described
+   - Open the corresponding detail plan file (e.g., `detail_plans/01_add_data_models.md`)
+   - Understand the scope, files, changes, and side effects described
 
 3. **Implement the plan**:
    - Write clean, readable code with comments
@@ -62,19 +58,17 @@ and side effects described
    - Fix any failures before proceeding
 
 5. **Update the TODO checklist**:
-   - Mark the completed item as done \
-(`- [x]`) in `detail_plans/TODO.md`
+   - Mark the completed item as done (`- [x]`) in `detail_plans/TODO.md`
 
-6. **Loop back to step 1** and continue \
-with the next unchecked item.
+6. **Loop back to step 1** and continue with the next unchecked item.
 
 After all items are done:
 - Summarize what was created/modified
 - Note any deviations from the plan and why
 - List any remaining considerations
 
-Focus on quality and correctness. Implement \
-exactly what each plan file specifies."""
+Focus on quality and correctness. Implement exactly what each plan file specifies.
+"""
 
 
 class CoderAgent:
